@@ -12,8 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Share2, Copy } from "lucide-react";
 
 const ScriptInterpreter = () => {
-  const [unlockingScript, setUnlockingScript] = useState("304402205d8c27451d4ef462264b9f9781999d220fa1a5b9c5a86fabe6f7a31d95f94a5f022034296b82e9582f5b8542fea7d7cf010f84bec76f6f05e74f5c8acaa235f693ec41");
-  const [lockingScript, setLockingScript] = useState("026989c55177f4d406f04ebdfb4884452b4cd927337c0b47cdd82c1a10b8b66f0f OP_CHECKSIG");
+  const [unlockingScript, setUnlockingScript] = useState("");
+  const [lockingScript, setLockingScript] = useState("");
   const [scriptState, setScriptState] = useState<ScriptState | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const { toast } = useToast();
@@ -142,7 +142,7 @@ const ScriptInterpreter = () => {
             <Textarea
               value={unlockingScript}
               onChange={(e) => setUnlockingScript(e.target.value)}
-              placeholder="Enter unlocking script (one instruction per line)&#10;Example:&#10;OP_1&#10;OP_2&#10;OP_ADD"
+              placeholder="Enter unlocking script&#10;Example:&#10;OP_1&#10;OP_2"
               className="font-mono bg-slate-900 border-slate-600 text-green-400 min-h-32"
               disabled={isExecuting}
             />
@@ -157,7 +157,7 @@ const ScriptInterpreter = () => {
             <Textarea
               value={lockingScript}
               onChange={(e) => setLockingScript(e.target.value)}
-              placeholder="Enter locking script (one instruction per line)&#10;Example:&#10;OP_3&#10;OP_EQUAL"
+              placeholder="Enter locking script&#10;Example:&#10;OP_ADD&#10;OP_3&#10;OP_EQUAL"
               className="font-mono bg-slate-900 border-slate-600 text-red-400 min-h-32"
               disabled={isExecuting}
             />
