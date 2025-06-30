@@ -1,4 +1,8 @@
 import type { Config } from "tailwindcss";
+import colors from "tailwindcss/colors";
+
+// Remove deprecated colors to avoid warnings
+const { lightBlue, warmGray, trueGray, coolGray, blueGray, ...tailwindColors } = colors;
 
 export default {
 	darkMode: ["class"],
@@ -9,6 +13,17 @@ export default {
 		"./src/**/*.{ts,tsx}",
 	],
 	prefix: "",
+	safelist: [
+		// Dynamic classes for StackVisualizer
+		{
+			pattern: /(bg|text|border)-(yellow|fuchsia|pink)-(300|500|600|700)/,
+			variants: ['hover', 'focus'],
+		},
+		// Opacity variants
+		{
+			pattern: /(bg|border)-(yellow|fuchsia|pink)-(500|600)\/\d+/,
+		},
+	],
 	theme: {
 		container: {
 			center: true,
@@ -19,6 +34,9 @@ export default {
 		},
 		extend: {
 			colors: {
+				// Add default Tailwind colors first
+				...tailwindColors,
+				// Then add custom colors (these will override if there are conflicts)
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
 				ring: 'hsl(var(--ring))',

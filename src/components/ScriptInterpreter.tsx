@@ -136,7 +136,7 @@ const ScriptInterpreter = () => {
       <div className="space-y-6">
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-orange-400">Unlocking Script</CardTitle>
+            <CardTitle className="text-gray-400">Unlocking Script</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
@@ -151,14 +151,14 @@ const ScriptInterpreter = () => {
 
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
-            <CardTitle className="text-orange-400">Locking Script</CardTitle>
+            <CardTitle className="text-gray-400">Locking Script</CardTitle>
           </CardHeader>
           <CardContent>
             <Textarea
               value={lockingScript}
               onChange={(e) => setLockingScript(e.target.value)}
               placeholder="Enter locking script (one instruction per line)&#10;Example:&#10;OP_3&#10;OP_EQUAL"
-              className="font-mono bg-slate-900 border-slate-600 text-blue-400 min-h-32"
+              className="font-mono bg-slate-900 border-slate-600 text-red-400 min-h-32"
               disabled={isExecuting}
             />
           </CardContent>
@@ -168,7 +168,7 @@ const ScriptInterpreter = () => {
           <Button 
             onClick={initializeExecution} 
             disabled={isExecuting}
-            className="bg-orange-600 hover:bg-orange-700"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             Initialize Execution
           </Button>
@@ -176,7 +176,7 @@ const ScriptInterpreter = () => {
             onClick={executeNextStep} 
             disabled={!scriptState || scriptState.isComplete}
             variant="outline"
-            className="border-orange-400 text-orange-400 hover:bg-orange-400 hover:text-slate-900"
+            className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
           >
             Next Step
           </Button>
