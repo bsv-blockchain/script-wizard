@@ -1,4 +1,5 @@
-import { Script, OP, LockingScript, UnlockingScript, Utils, Spend } from '@bsv/sdk';
+import { Script, OP, LockingScript, UnlockingScript, Utils } from '@bsv/sdk';
+import Spend from './Spend';
 
 export interface ScriptInstruction {
   opcode: string;
