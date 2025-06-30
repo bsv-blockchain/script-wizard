@@ -1,73 +1,106 @@
-# Welcome to your Lovable project
+# BSV Script Wizard Debugger
 
-## Project info
+An interactive Bitcoin Script Interpreter for debugging and visualizing BSV scripts step-by-step. Perfect for developers, educators, and anyone learning about Bitcoin script execution.
 
-**URL**: https://lovable.dev/projects/bdd0c020-6e93-44ff-b90c-b34ed72e520f
+## 🚀 Features
 
-## How can I edit this code?
+- **Step-by-Step Execution**: Debug Bitcoin scripts instruction by instruction
+- **Stack Visualization**: Real-time visualization of main stack and alt stack operations
+- **Script Sharing**: Share scripts via URL with automatic encoding/decoding
+- **Auto-Scrolling**: Automatically scroll to the currently executing instruction
+- **BSV SDK Integration**: Uses the official @bsv/sdk for accurate script execution
+- **Modern UI**: Clean, responsive interface with dark theme
+- **Educational Tool**: Perfect for learning Bitcoin script opcodes and execution flow
 
-There are several ways of editing your application.
+## 🎯 How to Use
 
-**Use Lovable**
+1. **Enter Scripts**: Input your unlocking script and locking script
+2. **Initialize**: Click "Initialize Execution" to prepare the script for debugging
+3. **Step Through**: Use "Next Step" to execute instructions one at a time
+4. **Monitor Stack**: Watch how the stack changes with each operation
+5. **Share**: Use the "Share Script" button to generate a shareable URL
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/bdd0c020-6e93-44ff-b90c-b34ed72e520f) and start prompting.
+## 📋 Example Scripts
 
-Changes made via Lovable will be committed automatically to this repo.
+**Simple Addition:**
+- Unlocking Script: `OP_1 OP_2`
+- Locking Script: `OP_ADD OP_3 OP_EQUAL`
 
-**Use your preferred IDE**
+**Signature Verification:**
+- Unlocking Script: `304402205d8c27451d4ef462264b9f9781999d220fa1a5b9c5a86fabe6f7a31d95f94a5f022034296b82e9582f5b8542fea7d7cf010f84bec76f6f05e74f5c8acaa235f693ec41`
+- Locking Script: `026989c55177f4d406f04ebdfb4884452b4cd927337c0b47cdd82c1a10b8b66f0f OP_CHECKSIG`
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+CHECKSIGs will not actually evalujate signatures, but rather returns true for any public key and signature.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Technical Stack
 
-Follow these steps:
+- **Frontend**: React 18 with TypeScript
+- **Styling**: Tailwind CSS with shadcn/ui components
+- **Bitcoin Library**: @bsv/sdk for script execution
+- **Build Tool**: Vite
+- **Icons**: Lucide React
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 🏃‍♂️ Development
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Prerequisites
+- Node.js 18+ and npm
 
-# Step 3: Install the necessary dependencies.
-npm i
+### Getting Started
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+# Clone the repository
+git clone https://github.com/sirdeggen/script-wizard-debugger.git
+
+# Navigate to project directory
+cd script-wizard-debugger
+
+# Install dependencies
+npm install
+
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Build for Production
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# Build the application
+npm run build
 
-**Use GitHub Codespaces**
+# Preview the build
+npm run preview
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🔧 Key Components
 
-## What technologies are used for this project?
+- **ScriptInterpreter**: Main component handling script execution and state management
+- **ScriptDisplay**: Visualizes script instructions with execution highlighting
+- **StackVisualizer**: Shows real-time stack and alt-stack states
+- **URL Utils**: Handles script sharing via URL parameters
 
-This project is built with:
+## 🎓 Educational Use
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+This tool is perfect for:
+- Learning Bitcoin script opcodes and their behavior
+- Understanding stack-based execution model
+- Debugging complex script conditions
+- Teaching Bitcoin development concepts
+- Exploring different script patterns and templates
 
-## How can I deploy this project?
+## 🤝 Contributing
 
-Simply open [Lovable](https://lovable.dev/projects/bdd0c020-6e93-44ff-b90c-b34ed72e520f) and click on Share -> Publish.
+Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.
 
-## Can I connect a custom domain to my Lovable project?
+## 📄 License
 
-Yes, you can!
+This project is open source and available under the OpenBSV license.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🔗 Links
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+- [Live Demo](https://script.brc.dev)
+- [BSV SDK Documentation](https://bsv-blockchain.github.io/ts-sdk)
+- [Bitcoin Script Reference](https://wiki.bitcoinsv.io/index.php/Script)
+
+---
+
+*Built for the BSV developer community*
