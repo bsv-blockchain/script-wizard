@@ -30,7 +30,8 @@ const ScriptInterpreter = () => {
         altStack: [],
         isComplete: false,
         isValid: false,
-        unlockingScriptLength: unlockingInstructions.length
+        unlockingScriptLength: unlockingInstructions.length,
+        context: 'UnlockingScript' as const
       };
       
       setScriptState(initialState);
