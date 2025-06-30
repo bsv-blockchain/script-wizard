@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScriptInstruction } from "@/utils/scriptUtils";
 
@@ -14,13 +14,28 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
   currentIndex, 
   unlockingScriptLength 
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const currentInstructionRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to keep current instruction at bottom of visible area
+  useEffect(() => {
+    if (currentInstructionRef.current && currentIndex >= 0) {
+      // Use scrollIntoView to position the element at the bottom of the container
+      currentInstructionRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end', // Positions the element at the bottom of the visible area
+        inline: 'nearest'
+      });
+    }
+  }, [currentIndex]);
+
   return (
     <Card className="bg-slate-800 border-slate-700">
       <CardHeader>
         <CardTitle className="text-gray-400">Script Execution</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-1 max-h-64 overflow-y-auto">
+        <div ref={containerRef} className="space-y-1 max-h-64 overflow-y-auto">
           {instructions.map((instruction, index) => {
             const isUnlockingScript = index < unlockingScriptLength;
             const isCurrent = index === currentIndex;
@@ -29,6 +44,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             return (
               <div
                 key={index}
+                ref={isCurrent ? currentInstructionRef : null}
                 className={`
                   p-2 rounded font-mono text-sm transition-all duration-300
                   ${isCurrent 
