@@ -122,21 +122,6 @@ const ScriptInterpreter = () => {
     });
   }, [scriptState, toast]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'F10') {
-        event.preventDefault();
-        executeNextStep();
-      }
-      if (event.key === 'F5') {
-        event.preventDefault();
-        continueExecution();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [executeNextStep, continueExecution]);
-
   const executeNextStep = useCallback(() => {
     if (!scriptState || scriptState.isComplete) return;
     
@@ -163,6 +148,21 @@ const ScriptInterpreter = () => {
       setIsExecuting(false);
     }
   }, [scriptState, toast]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'F10') {
+        event.preventDefault();
+        executeNextStep();
+      }
+      if (event.key === 'F5') {
+        event.preventDefault();
+        continueExecution();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [executeNextStep, continueExecution]);
 
   const resetExecution = useCallback(() => {
     setScriptState(null);
