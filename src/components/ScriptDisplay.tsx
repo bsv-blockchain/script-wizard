@@ -1,18 +1,23 @@
 
 import React, { useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Circle } from "lucide-react";
 import { ScriptInstruction } from "@/utils/scriptUtils";
 
 interface ScriptDisplayProps {
   instructions: ScriptInstruction[];
   currentIndex: number;
   unlockingScriptLength: number;
+  breakpoints: number[];
+  onToggleBreakpoint: (index: number) => void;
 }
 
-const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ 
-  instructions, 
-  currentIndex, 
-  unlockingScriptLength 
+const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
+  instructions,
+  currentIndex,
+  unlockingScriptLength,
+  breakpoints,
+  onToggleBreakpoint
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const currentInstructionRef = useRef<HTMLDivElement>(null);
@@ -40,6 +45,7 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
             const isUnlockingScript = index < unlockingScriptLength;
             const isCurrent = index === currentIndex;
             const isExecuted = index < currentIndex;
+            const hasBreakpoint = breakpoints.includes(index);
             
             return (
               <div
@@ -73,8 +79,19 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
                       </span>
                     )}
                   </span>
-                  <span className="text-xs text-slate-500">
-                    {index + 1}/{instructions.length}
+                  <span className="flex items-center gap-2">
+                    <button
+                      onClick={() => onToggleBreakpoint(index)}
+                      className="p-0 m-0"
+                    >
+                      <Circle
+                        size={12}
+                        className={hasBreakpoint ? 'text-red-500 fill-red-500' : 'text-slate-500'}
+                      />
+                    </button>
+                    <span className="text-xs text-slate-500">
+                      {index + 1}/{instructions.length}
+                    </span>
                   </span>
                 </div>
               </div>

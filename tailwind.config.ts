@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import colors from "tailwindcss/colors";
+import animatePlugin from "tailwindcss-animate";
 
 // Remove deprecated colors to avoid warnings
 const { lightBlue, warmGray, trueGray, coolGray, blueGray, ...tailwindColors } = colors;
@@ -110,5 +111,5 @@ export default {
 			}
 		}
 	},
-	plugins: [require("tailwindcss-animate")],
+        plugins: [animatePlugin],
 } satisfies Config;
