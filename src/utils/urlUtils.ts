@@ -5,6 +5,7 @@
 export interface ScriptParams {
   unlock?: string;
   lock?: string;
+  breakpoints?: number[];
 }
 
 /**
@@ -40,6 +41,7 @@ export const parseScriptParamsFromUrl = (): ScriptParams => {
   
   const unlockParam = urlParams.get('unlock');
   const lockParam = urlParams.get('lock');
+  const bpParam = urlParams.get('bp');
   
   if (unlockParam) {
     params.unlock = decodeScriptFromUrl(unlockParam);
@@ -48,6 +50,13 @@ export const parseScriptParamsFromUrl = (): ScriptParams => {
   if (lockParam) {
     params.lock = decodeScriptFromUrl(lockParam);
   }
+
+  if (bpParam) {
+    params.breakpoints = bpParam
+      .split(',')
+      .map((n) => parseInt(n, 10))
+      .filter((n) => !isNaN(n));
+  }
   
   return params;
 };
@@ -55,7 +64,11 @@ export const parseScriptParamsFromUrl = (): ScriptParams => {
 /**
  * Generates a shareable URL with encoded scripts
  */
-export const generateShareableUrl = (unlockingScript: string, lockingScript: string): string => {
+export const generateShareableUrl = (
+  unlockingScript: string,
+  lockingScript: string,
+  breakpoints: number[] = []
+): string => {
   const baseUrl = window.location.origin + window.location.pathname;
   const params = new URLSearchParams();
   
@@ -67,13 +80,21 @@ export const generateShareableUrl = (unlockingScript: string, lockingScript: str
     params.set('lock', encodeScriptForUrl(lockingScript));
   }
   
+  if (breakpoints.length > 0) {
+    params.set('bp', breakpoints.join(','));
+  }
+
   return params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
 };
 
 /**
  * Updates the current URL with script parameters without page reload
  */
-export const updateUrlWithScripts = (unlockingScript: string, lockingScript: string): void => {
+export const updateUrlWithScripts = (
+  unlockingScript: string,
+  lockingScript: string,
+  breakpoints: number[] = []
+): void => {
   const params = new URLSearchParams();
   
   if (unlockingScript.trim()) {
@@ -84,7 +105,11 @@ export const updateUrlWithScripts = (unlockingScript: string, lockingScript: str
     params.set('lock', encodeScriptForUrl(lockingScript));
   }
   
-  const newUrl = params.toString() 
+  if (breakpoints.length > 0) {
+    params.set('bp', breakpoints.join(','));
+  }
+
+  const newUrl = params.toString()
     ? `${window.location.pathname}?${params.toString()}`
     : window.location.pathname;
     

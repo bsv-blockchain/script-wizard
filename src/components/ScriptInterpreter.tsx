@@ -16,6 +16,7 @@ const ScriptInterpreter = () => {
   const [lockingScript, setLockingScript] = useState("");
   const [scriptState, setScriptState] = useState<ScriptState | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [breakpoints, setBreakpoints] = useState<number[]>([]);
   const { toast } = useToast();
 
   // Load scripts from URL parameters on component mount
@@ -29,15 +30,18 @@ const ScriptInterpreter = () => {
         setLockingScript(urlParams.lock);
       }
     }
+    if (urlParams.breakpoints) {
+      setBreakpoints(urlParams.breakpoints);
+    }
   }, [toast]);
 
   // Update URL when scripts change (debounced)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      updateUrlWithScripts(unlockingScript, lockingScript);
+      updateUrlWithScripts(unlockingScript, lockingScript, breakpoints);
     }, 1000);
     return () => clearTimeout(timeoutId);
-  }, [unlockingScript, lockingScript]);
+  }, [unlockingScript, lockingScript, breakpoints]);
 
   const initializeExecution = useCallback(() => {
     try {
@@ -73,6 +77,51 @@ const ScriptInterpreter = () => {
     }
   }, [unlockingScript, lockingScript, toast]);
 
+  const toggleBreakpoint = useCallback((index: number) => {
+    setBreakpoints((prev) =>
+      prev.includes(index)
+        ? prev.filter((bp) => bp !== index)
+        : [...prev, index].sort((a, b) => a - b)
+    );
+  }, []);
+
+  const continueExecution = useCallback(() => {
+    if (!scriptState || scriptState.isComplete) return;
+    let state = scriptState;
+    do {
+      state = executeStep(state);
+    } while (!state.isComplete && !breakpoints.includes(state.currentIndex));
+    setScriptState(state);
+
+    if (state.isComplete) {
+      setIsExecuting(false);
+      toast({
+        title: state.isValid ? 'Script Valid!' : 'Script Invalid',
+        description: state.isValid
+          ? 'Script executed successfully'
+          : 'Script execution failed',
+        variant: state.isValid ? 'default' : 'destructive',
+      });
+    }
+  }, [scriptState, breakpoints, toast]);
+
+  const runToEnd = useCallback(() => {
+    if (!scriptState || scriptState.isComplete) return;
+    let state = scriptState;
+    while (!state.isComplete) {
+      state = executeStep(state);
+    }
+    setScriptState(state);
+    setIsExecuting(false);
+    toast({
+      title: state.isValid ? 'Script Valid!' : 'Script Invalid',
+      description: state.isValid
+        ? 'Script executed successfully'
+        : 'Script execution failed',
+      variant: state.isValid ? 'default' : 'destructive',
+    });
+  }, [scriptState, toast]);
+
   const executeNextStep = useCallback(() => {
     if (!scriptState || scriptState.isComplete) return;
     
@@ -100,13 +149,32 @@ const ScriptInterpreter = () => {
     }
   }, [scriptState, toast]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'F10') {
+        event.preventDefault();
+        executeNextStep();
+      }
+      if (event.key === 'F5') {
+        event.preventDefault();
+        continueExecution();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [executeNextStep, continueExecution]);
+
   const resetExecution = useCallback(() => {
     setScriptState(null);
     setIsExecuting(false);
   }, []);
 
   const shareScript = useCallback(async () => {
-    const shareableUrl = generateShareableUrl(unlockingScript, lockingScript);
+    const shareableUrl = generateShareableUrl(
+      unlockingScript,
+      lockingScript,
+      breakpoints
+    );
     
     try {
       await navigator.clipboard.writeText(shareableUrl);
@@ -128,7 +196,7 @@ const ScriptInterpreter = () => {
         description: "Shareable link has been copied to your clipboard",
       });
     }
-  }, [unlockingScript, lockingScript, toast]);
+  }, [unlockingScript, lockingScript, breakpoints, toast]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -172,13 +240,29 @@ const ScriptInterpreter = () => {
           >
             Initialize Execution
           </Button>
-          <Button 
-            onClick={executeNextStep} 
+          <Button
+            onClick={executeNextStep}
             disabled={!scriptState || scriptState.isComplete}
             variant="outline"
             className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
           >
             Next Step
+          </Button>
+          <Button
+            onClick={continueExecution}
+            disabled={!scriptState || scriptState.isComplete}
+            variant="outline"
+            className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
+          >
+            Continue
+          </Button>
+          <Button
+            onClick={runToEnd}
+            disabled={!scriptState || scriptState.isComplete}
+            variant="outline"
+            className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
+          >
+            Run To End
           </Button>
           <Button 
             onClick={resetExecution} 
@@ -203,10 +287,12 @@ const ScriptInterpreter = () => {
       <div className="space-y-6">
         {scriptState && (
           <>
-            <ScriptDisplay 
+            <ScriptDisplay
               instructions={scriptState.instructions}
               currentIndex={scriptState.currentIndex}
               unlockingScriptLength={scriptState.unlockingScriptLength}
+              breakpoints={breakpoints}
+              onToggleBreakpoint={toggleBreakpoint}
             />
             <Separator className="bg-slate-600" />
             <StackVisualizer 
