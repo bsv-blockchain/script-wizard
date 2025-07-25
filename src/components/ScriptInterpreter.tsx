@@ -6,16 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import StackVisualizer from "./StackVisualizer";
 import ScriptDisplay from "./ScriptDisplay";
-import { parseScript, executeStep, ScriptState, ScriptInstruction } from "@/utils/scriptUtils";
+import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBreakpoint, findNextBreakpoint, ScriptState, ScriptInstruction } from "@/utils/scriptUtils";
 import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts } from "@/utils/urlUtils";
 import { useToast } from "@/hooks/use-toast";
-import { Share2, Copy } from "lucide-react";
+import { Share2, Copy, Play, Pause, SkipForward, RotateCcw } from "lucide-react";
 
 const ScriptInterpreter = () => {
   const [unlockingScript, setUnlockingScript] = useState("");
   const [lockingScript, setLockingScript] = useState("");
   const [scriptState, setScriptState] = useState<ScriptState | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
+
   const { toast } = useToast();
 
   // Load scripts from URL parameters on component mount
@@ -30,6 +32,8 @@ const ScriptInterpreter = () => {
       }
     }
   }, [toast]);
+
+
 
   // Update URL when scripts change (debounced)
   useEffect(() => {
@@ -84,9 +88,9 @@ const ScriptInterpreter = () => {
         setIsExecuting(false);
         toast({
           title: newState.isValid ? "Script Valid!" : "Script Invalid",
-          description: newState.isValid 
+          description: newState.executionError || (newState.isValid 
             ? "Script executed successfully" 
-            : "Script execution failed",
+            : "Script execution failed"),
           variant: newState.isValid ? "default" : "destructive",
         });
       }
@@ -100,10 +104,126 @@ const ScriptInterpreter = () => {
     }
   }, [scriptState, toast]);
 
+  const executeRunMode = useCallback(() => {
+    if (!scriptState || scriptState.isComplete) return;
+    
+    setIsRunning(true);
+    
+    // Use setTimeout to allow UI to update
+    setTimeout(() => {
+      try {
+        const newState = executeRun(scriptState);
+        setScriptState(newState);
+        setIsRunning(false);
+        
+        if (newState.isComplete) {
+          setIsExecuting(false);
+          toast({
+            title: newState.isValid ? "Script Valid!" : "Script Invalid",
+            description: newState.executionError || (newState.isValid 
+              ? "Script executed successfully" 
+              : "Script execution failed"),
+            variant: newState.isValid ? "default" : "destructive",
+          });
+        } else if (newState.executionError) {
+          toast({
+            title: "Execution Stopped",
+            description: newState.executionError,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Breakpoint Hit",
+            description: "Execution paused at breakpoint",
+          });
+        }
+      } catch (error) {
+        setIsRunning(false);
+        toast({
+          title: "Execution Error",
+          description: error instanceof Error ? error.message : "Failed to run script",
+          variant: "destructive",
+        });
+        setIsExecuting(false);
+      }
+    }, 100);
+  }, [scriptState, toast]);
+
+  const handleBreakpointToggle = useCallback((instructionIndex: number) => {
+    if (!scriptState) return;
+    
+    const newState = toggleBreakpoint(scriptState, instructionIndex);
+    setScriptState(newState);
+    
+    toast({
+      title: "Breakpoint Toggled",
+      description: `Breakpoint ${newState.breakpoints?.has(instructionIndex) ? 'added' : 'removed'} at instruction ${instructionIndex}`,
+    });
+  }, [scriptState, toast]);
+
+  const executeToNextBreakpointHandler = useCallback(() => {
+    if (!scriptState || scriptState.isComplete) return;
+    
+    // Check if there are any breakpoints ahead
+    const nextBreakpointIndex = findNextBreakpoint(scriptState);
+    if (nextBreakpointIndex === null) {
+      toast({
+        title: "No More Breakpoints",
+        description: "No breakpoints found ahead. Use 'Run' to execute to completion.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsRunning(true);
+    
+    // Use setTimeout to allow UI to update
+    setTimeout(() => {
+      try {
+        const newState = executeToNextBreakpoint(scriptState);
+        setScriptState(newState);
+        setIsRunning(false);
+        
+        if (newState.isComplete) {
+          setIsExecuting(false);
+          toast({
+            title: newState.isValid ? "Script Valid!" : "Script Invalid",
+            description: newState.executionError || (newState.isValid 
+              ? "Script executed successfully" 
+              : "Script execution failed"),
+            variant: newState.isValid ? "default" : "destructive",
+          });
+        } else if (newState.executionError) {
+          toast({
+            title: "Execution Stopped",
+            description: newState.executionError,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Next Breakpoint Reached",
+            description: `Stopped at instruction ${newState.currentIndex + 1}`,
+          });
+        }
+      } catch (error) {
+        setIsRunning(false);
+        toast({
+          title: "Execution Error",
+          description: error instanceof Error ? error.message : "Failed to execute to next breakpoint",
+          variant: "destructive",
+        });
+        setIsExecuting(false);
+      }
+    }, 100);
+  }, [scriptState, toast]);
+
   const resetExecution = useCallback(() => {
     setScriptState(null);
     setIsExecuting(false);
+    setIsRunning(false);
   }, []);
+
+
 
   const shareScript = useCallback(async () => {
     const shareableUrl = generateShareableUrl(unlockingScript, lockingScript);
@@ -130,8 +250,26 @@ const ScriptInterpreter = () => {
     }
   }, [unlockingScript, lockingScript, toast]);
 
+  // Check if there are any breakpoints set
+  const hasBreakpoints = scriptState && (
+    (scriptState.breakpoints && scriptState.breakpoints.size > 0) ||
+    scriptState.instructions.some(instruction => instruction.opcode === 'OP_NOP69')
+  );
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Share Script Button - Top Right */}
+      <div className="fixed top-4 right-4 z-10">
+        <Button 
+          onClick={shareScript}
+          variant="outline"
+          className="bg-slate-900 border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
+          title="Share this script via URL"
+        >
+          <Share2 size={16} />
+        </Button>
+      </div>
+
       {/* Left Column - Script Input */}
       <div className="space-y-6">
         <Card className="bg-slate-800 border-slate-700">
@@ -165,37 +303,69 @@ const ScriptInterpreter = () => {
         </Card>
 
         <div className="flex gap-3 flex-wrap">
-          <Button 
-            onClick={initializeExecution} 
-            disabled={isExecuting}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            Initialize Execution
-          </Button>
-          <Button 
-            onClick={executeNextStep} 
-            disabled={!scriptState || scriptState.isComplete}
-            variant="outline"
-            className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
-          >
-            Next Step
-          </Button>
-          <Button 
-            onClick={resetExecution} 
-            disabled={!scriptState}
-            variant="outline"
-            className="border-slate-400 text-slate-400 hover:bg-slate-400 hover:text-slate-900"
-          >
-            Reset
-          </Button>
-          <Button 
-            onClick={shareScript}
-            variant="outline"
-            className="border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900 gap-2"
-          >
-            <Share2 size={16} />
-            Share Script
-          </Button>
+          {/* Initialize Execution - Only show if not initialized */}
+          {!scriptState && (
+            <Button 
+              onClick={initializeExecution} 
+              disabled={isExecuting || isRunning}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              Initialize Execution
+            </Button>
+          )}
+          
+          {/* Reset - Only show if initialized, positioned right after Initialize */}
+          {scriptState && (
+            <Button 
+              onClick={resetExecution} 
+              disabled={isRunning}
+              variant="outline"
+              className="bg-slate-900 border-slate-400 text-slate-400 hover:bg-slate-400 hover:text-slate-900 gap-2"
+              title="Reset execution and return to initialization"
+            >
+              <RotateCcw size={16} />
+              Reset
+            </Button>
+          )}
+          
+          {/* Execution Controls - Only show when initialized */}
+          {scriptState && (
+            <>
+              <Button 
+                onClick={executeNextStep} 
+                disabled={scriptState.isComplete || isRunning}
+                variant="outline"
+                className="bg-slate-900 border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
+              >
+                Next Step
+              </Button>
+              <Button 
+                onClick={executeRunMode} 
+                disabled={scriptState.isComplete || isRunning}
+                variant="outline"
+                className="bg-slate-900 border-green-400 text-green-400 hover:bg-green-400 hover:text-slate-900 gap-2"
+              >
+                {isRunning ? <Pause size={16} /> : <Play size={16} />}
+                {isRunning ? 'Running...' : 'Run'}
+              </Button>
+              
+              {/* Next Breakpoint - Only show when breakpoints exist */}
+              {hasBreakpoints && findNextBreakpoint(scriptState) && (
+                <Button 
+                  onClick={executeToNextBreakpointHandler} 
+                  disabled={scriptState.isComplete || isRunning}
+                  variant="outline"
+                  className="bg-slate-900 border-orange-400 text-orange-400 hover:bg-orange-400 hover:text-slate-900 gap-2"
+                  title="Execute until the next breakpoint"
+                >
+                  <SkipForward size={16} />
+                  Next Breakpoint
+                </Button>
+              )}
+            </>
+          )}
+          
+
         </div>
       </div>
 
@@ -207,6 +377,8 @@ const ScriptInterpreter = () => {
               instructions={scriptState.instructions}
               currentIndex={scriptState.currentIndex}
               unlockingScriptLength={scriptState.unlockingScriptLength}
+              breakpoints={scriptState.breakpoints}
+              onBreakpointToggle={handleBreakpointToggle}
             />
             <Separator className="bg-slate-600" />
             <StackVisualizer 

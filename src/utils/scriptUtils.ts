@@ -18,6 +18,9 @@ export interface ScriptState {
   unlockingScriptLength: number;
   context: 'UnlockingScript' | 'LockingScript';
   spend?: Spend;  // Internal Spend instance for execution
+  isRunning?: boolean;  // Track if in run mode
+  breakpoints?: Set<number>;  // Set of instruction indices that are breakpoints
+  executionError?: string;  // Store execution error message
 }
 
 const castToBool = (val: Readonly<number[]>): boolean => {
@@ -328,7 +331,8 @@ export const executeStep = (state: ScriptState): ScriptState => {
       context: newContext,
       isComplete,
       isValid,
-      spend
+      spend,
+      executionError: undefined  // Clear any previous error
     };
     
   } catch (error) {
@@ -336,7 +340,192 @@ export const executeStep = (state: ScriptState): ScriptState => {
     return {
       ...state,
       isComplete: true,
-      isValid: false
+      isValid: false,
+      executionError: error instanceof Error ? error.message : 'Unknown execution error'
     };
   }
+};
+
+// Execute script in run mode until completion, error, or breakpoint
+export const executeRun = (state: ScriptState): ScriptState => {
+  if (state.isComplete) {
+    return { ...state, isRunning: false };
+  }
+  
+  let currentState = { ...state, isRunning: true };
+  const maxSteps = 10000; // Prevent infinite loops
+  let stepCount = 0;
+  
+  while (!currentState.isComplete && stepCount < maxSteps) {
+    // Check if current instruction is a breakpoint (OP_NOP69)
+    if (currentState.breakpoints?.has(currentState.currentIndex)) {
+      console.log(`Hit breakpoint at instruction ${currentState.currentIndex}`);
+      return { ...currentState, isRunning: false };
+    }
+    
+    // Check if current instruction is OP_NOP69 (breakpoint marker)
+    const currentInstruction = currentState.instructions[currentState.currentIndex];
+    if (currentInstruction && (currentInstruction.opcode === 'OP_NOP69' || currentInstruction.rawOpcode === 69)) {
+      console.log(`Hit OP_NOP69 breakpoint at instruction ${currentState.currentIndex}`);
+      return { ...currentState, isRunning: false };
+    }
+    
+    try {
+      const nextState = executeStep(currentState);
+      currentState = { ...nextState, isRunning: true };
+      stepCount++;
+      
+      // If there was an execution error, stop running
+      if (currentState.executionError) {
+        return { ...currentState, isRunning: false };
+      }
+    } catch (error) {
+      console.error('Error during run execution:', error);
+      return {
+        ...currentState,
+        isComplete: true,
+        isValid: false,
+        isRunning: false,
+        executionError: error instanceof Error ? error.message : 'Unknown execution error'
+      };
+    }
+  }
+  
+  if (stepCount >= maxSteps) {
+    console.warn('Execution stopped due to step limit');
+    return {
+      ...currentState,
+      isComplete: true,
+      isValid: false,
+      isRunning: false,
+      executionError: 'Execution stopped: too many steps (possible infinite loop)'
+    };
+  }
+  
+  return { ...currentState, isRunning: false };
+};
+
+// Toggle breakpoint at a specific instruction index
+export const toggleBreakpoint = (state: ScriptState, instructionIndex: number): ScriptState => {
+  const breakpoints = new Set(state.breakpoints || []);
+  
+  if (breakpoints.has(instructionIndex)) {
+    breakpoints.delete(instructionIndex);
+  } else {
+    breakpoints.add(instructionIndex);
+  }
+  
+  return {
+    ...state,
+    breakpoints
+  };
+};
+
+// Check if an instruction is a breakpoint
+export const isBreakpoint = (state: ScriptState, instructionIndex: number): boolean => {
+  return state.breakpoints?.has(instructionIndex) || 
+         (state.instructions[instructionIndex]?.opcode === 'OP_NOP69' || 
+          state.instructions[instructionIndex]?.rawOpcode === 69);
+};
+
+// Execute script until the next breakpoint from current position
+export const executeToNextBreakpoint = (state: ScriptState): ScriptState => {
+  if (state.isComplete) {
+    return { ...state, isRunning: false };
+  }
+  
+  let currentState = { ...state, isRunning: true };
+  const maxSteps = 10000; // Prevent infinite loops
+  let stepCount = 0;
+  let foundBreakpoint = false;
+  
+  // First, advance past the current position if we're already at a breakpoint
+  if (isBreakpoint(currentState, currentState.currentIndex)) {
+    try {
+      const nextState = executeStep(currentState);
+      currentState = { ...nextState, isRunning: true };
+      stepCount++;
+      
+      if (currentState.executionError || currentState.isComplete) {
+        return { ...currentState, isRunning: false };
+      }
+    } catch (error) {
+      return {
+        ...currentState,
+        isComplete: true,
+        isValid: false,
+        isRunning: false,
+        executionError: error instanceof Error ? error.message : 'Unknown execution error'
+      };
+    }
+  }
+  
+  // Continue execution until we hit the next breakpoint
+  while (!currentState.isComplete && stepCount < maxSteps && !foundBreakpoint) {
+    // Check if current instruction is a breakpoint
+    if (isBreakpoint(currentState, currentState.currentIndex)) {
+      console.log(`Hit next breakpoint at instruction ${currentState.currentIndex}`);
+      foundBreakpoint = true;
+      break;
+    }
+    
+    try {
+      const nextState = executeStep(currentState);
+      currentState = { ...nextState, isRunning: true };
+      stepCount++;
+      
+      // If there was an execution error, stop running
+      if (currentState.executionError) {
+        return { ...currentState, isRunning: false };
+      }
+    } catch (error) {
+      console.error('Error during next breakpoint execution:', error);
+      return {
+        ...currentState,
+        isComplete: true,
+        isValid: false,
+        isRunning: false,
+        executionError: error instanceof Error ? error.message : 'Unknown execution error'
+      };
+    }
+  }
+  
+  if (stepCount >= maxSteps) {
+    console.warn('Execution stopped due to step limit');
+    return {
+      ...currentState,
+      isComplete: true,
+      isValid: false,
+      isRunning: false,
+      executionError: 'Execution stopped: too many steps (possible infinite loop)'
+    };
+  }
+  
+  return { ...currentState, isRunning: false };
+};
+
+// Find the next breakpoint index from current position
+export const findNextBreakpoint = (state: ScriptState): number | null => {
+  const startIndex = state.currentIndex + 1;
+  
+  for (let i = startIndex; i < state.instructions.length; i++) {
+    if (isBreakpoint(state, i)) {
+      return i;
+    }
+  }
+  
+  return null; // No more breakpoints found
+};
+
+// Find the previous breakpoint index from current position
+export const findPreviousBreakpoint = (state: ScriptState): number | null => {
+  const startIndex = state.currentIndex - 1;
+  
+  for (let i = startIndex; i >= 0; i--) {
+    if (isBreakpoint(state, i)) {
+      return i;
+    }
+  }
+  
+  return null; // No previous breakpoints found
 };

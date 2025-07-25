@@ -5,6 +5,8 @@ An interactive Bitcoin Script Interpreter for debugging and visualizing BSV scri
 ## 🚀 Features
 
 - **Step-by-Step Execution**: Debug Bitcoin scripts instruction by instruction
+- **Run Mode**: Execute scripts continuously until completion, error, or breakpoint
+- **Breakpoint Support**: Set breakpoints by clicking on instructions or using OP_NOP69
 - **Stack Visualization**: Real-time visualization of main stack and alt stack operations
 - **Script Sharing**: Share scripts via URL with automatic encoding/decoding
 - **Auto-Scrolling**: Automatically scroll to the currently executing instruction
@@ -14,11 +16,19 @@ An interactive Bitcoin Script Interpreter for debugging and visualizing BSV scri
 
 ## 🎯 How to Use
 
+### Basic Debugging
 1. **Enter Scripts**: Input your unlocking script and locking script
 2. **Initialize**: Click "Initialize Execution" to prepare the script for debugging
 3. **Step Through**: Use "Next Step" to execute instructions one at a time
-4. **Monitor Stack**: Watch how the stack changes with each operation
-5. **Share**: Use the "Share Script" button to generate a shareable URL
+4. **Run Mode**: Click "Run" to execute continuously until completion or breakpoint
+5. **Monitor Stack**: Watch how the stack changes with each operation
+6. **Share**: Use the "Share Script" button to generate a shareable URL
+
+### Advanced Features
+- **Setting Breakpoints**: Click the circle icon next to any instruction to toggle a breakpoint
+- **OP_NOP69 Breakpoints**: Insert `OP_NOP69` in your script to create automatic breakpoints
+- **Next Breakpoint**: Jump directly to the next breakpoint without executing all instructions
+- **Error Handling**: Run mode will automatically stop on execution errors and show details
 
 ## 📋 Example Scripts
 
@@ -29,6 +39,12 @@ An interactive Bitcoin Script Interpreter for debugging and visualizing BSV scri
 **Signature Verification:**
 - Unlocking Script: `304402205d8c27451d4ef462264b9f9781999d220fa1a5b9c5a86fabe6f7a31d95f94a5f022034296b82e9582f5b8542fea7d7cf010f84bec76f6f05e74f5c8acaa235f693ec41`
 - Locking Script: `026989c55177f4d406f04ebdfb4884452b4cd927337c0b47cdd82c1a10b8b66f0f OP_CHECKSIG`
+
+**With Multiple Breakpoints:**
+- Unlocking Script: `OP_1 OP_2`
+- Locking Script: `OP_ADD OP_NOP69 OP_3 OP_NOP69 OP_EQUAL`
+
+*Use "Next Breakpoint" to jump between the OP_NOP69 markers*
 
 CHECKSIGs will not actually evalujate signatures, but rather returns true for any public key and signature.
 
