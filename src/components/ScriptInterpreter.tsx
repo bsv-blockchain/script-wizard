@@ -11,7 +11,11 @@ import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts } 
 import { useToast } from "@/hooks/use-toast";
 import { Share2, Copy, Play, Pause, SkipForward, RotateCcw } from "lucide-react";
 
-const ScriptInterpreter = () => {
+interface ScriptInterpreterProps {
+  onExecutionStateChange?: (isExecuting: boolean) => void;
+}
+
+const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = {}) => {
   const [unlockingScript, setUnlockingScript] = useState("");
   const [lockingScript, setLockingScript] = useState("");
   const [scriptState, setScriptState] = useState<ScriptState | null>(null);
@@ -42,6 +46,11 @@ const ScriptInterpreter = () => {
     }, 1000);
     return () => clearTimeout(timeoutId);
   }, [unlockingScript, lockingScript]);
+
+  // Notify parent when execution state changes
+  useEffect(() => {
+    onExecutionStateChange?.(scriptState !== null);
+  }, [scriptState, onExecutionStateChange]);
 
   const initializeExecution = useCallback(() => {
     try {
@@ -272,36 +281,7 @@ const ScriptInterpreter = () => {
 
       {/* Left Column - Script Input */}
       <div className="space-y-6">
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-gray-400">Unlocking Script</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={unlockingScript}
-              onChange={(e) => setUnlockingScript(e.target.value)}
-              placeholder="Enter unlocking script&#10;Example:&#10;OP_1&#10;OP_2"
-              className="font-mono bg-slate-900 border-slate-600 text-green-400 min-h-32"
-              disabled={isExecuting}
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-gray-400">Locking Script</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Textarea
-              value={lockingScript}
-              onChange={(e) => setLockingScript(e.target.value)}
-              placeholder="Enter locking script&#10;Example:&#10;OP_ADD&#10;OP_3&#10;OP_EQUAL"
-              className="font-mono bg-slate-900 border-slate-600 text-red-400 min-h-32"
-              disabled={isExecuting}
-            />
-          </CardContent>
-        </Card>
-
+        {/* Control Buttons - Always at the top */}
         <div className="flex gap-3 flex-wrap">
           {/* Initialize Execution - Only show if not initialized */}
           {!scriptState && (
@@ -364,9 +344,42 @@ const ScriptInterpreter = () => {
               )}
             </>
           )}
-          
-
         </div>
+
+        {/* Only show script input areas when not executing */}
+        {!scriptState && (
+          <>
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-gray-400">Unlocking Script</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={unlockingScript}
+                  onChange={(e) => setUnlockingScript(e.target.value)}
+                  placeholder="Enter unlocking script&#10;Example:&#10;OP_1&#10;OP_2"
+                  className="font-mono bg-slate-900 border-slate-600 text-green-400 min-h-32"
+                  disabled={isExecuting}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-gray-400">Locking Script</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  value={lockingScript}
+                  onChange={(e) => setLockingScript(e.target.value)}
+                  placeholder="Enter locking script&#10;Example:&#10;OP_ADD&#10;OP_3&#10;OP_EQUAL"
+                  className="font-mono bg-slate-900 border-slate-600 text-red-400 min-h-32"
+                  disabled={isExecuting}
+                />
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Right Column - Execution Visualization */}
