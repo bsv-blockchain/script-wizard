@@ -39,8 +39,10 @@ const uint8ArrayToHex = (arr: Uint8Array): string => {
 };
 
 // Helper function to convert hex string to Uint8Array
+// Accepts both uppercase and lowercase hex, with or without 0x prefix
+// Normalizes to lowercase internally
 const hexToUint8Array = (hex: string): Uint8Array => {
-  const cleanHex = hex.replace(/^0x/, '');
+  const cleanHex = hex.replace(/^0x/i, '').toLowerCase();
   const bytes = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < cleanHex.length; i += 2) {
     bytes[i / 2] = parseInt(cleanHex.substr(i, 2), 16);
@@ -64,11 +66,22 @@ const getOpcodeName = (opcode: number): string => {
 };
 
 export const parseScript = (scriptText: string): ScriptInstruction[] => {
-  const lines = scriptText.trim().split('\n').filter(line => line.trim() !== '');
+  const lines = scriptText.trim().split(/[\n ]+/).filter(line => line.trim() !== '');
   
   try {
     // First try to use Script.fromASM to get proper chunks
-    const asmScript = lines.join(' ');
+    // Normalize hex values to lowercase since SDK expects lowercase hex
+    const normalizedLines = lines.map(line => {
+      const trimmed = line.trim();
+      // Check if this line contains hex data (with or without 0x prefix)
+      if (/^0x/i.test(trimmed) || /^[0-9a-fA-F]+$/.test(trimmed)) {
+        return trimmed.replace(/^0x/i, '').toLowerCase();
+      }
+      return line;
+    });
+    
+    const asmScript = normalizedLines.join(' ');
+    console.log('Attempting SDK parsing with normalized ASM:', asmScript);
     const script = Script.fromASM(asmScript);
     
     // Convert script chunks to our instruction format
@@ -105,9 +118,9 @@ const parseScriptManual = (lines: string[]): ScriptInstruction[] => {
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed === '') continue;
     
-    // Handle hex data (starts with 0x or is all hex)
-    if (trimmed.startsWith('0x') || /^[0-9a-fA-F]+$/.test(trimmed)) {
-      const cleanHex = trimmed.replace(/^0x/, '');
+    // Handle hex data (starts with 0x or is all hex, case-insensitive)
+    if (/^0x/i.test(trimmed) || /^[0-9a-fA-F]+$/.test(trimmed)) {
+      const cleanHex = trimmed.replace(/^0x/i, '').toLowerCase();
       const dataLength = cleanHex.length / 2;
       let opcode: number;
       
@@ -204,15 +217,17 @@ const decodeScriptNumber = (data: Uint8Array): number => {
 };
 
 // Helper function to check if data represents true/false
+// Accepts both uppercase and lowercase hex
 const isTruthy = (data: string): boolean => {
-  if (!data || data === '00' || data === '') return false;
+  const normalizedData = data.toLowerCase();
+  if (!normalizedData || normalizedData === '00' || normalizedData === '') return false;
   
   // Check if all bytes are zero
-  for (let i = 0; i < data.length; i += 2) {
-    const byte = parseInt(data.substr(i, 2), 16);
+  for (let i = 0; i < normalizedData.length; i += 2) {
+    const byte = parseInt(normalizedData.substr(i, 2), 16);
     if (byte !== 0) {
       // If this is the last byte and it's 0x80 (negative zero), it's still false
-      if (i === data.length - 2 && byte === 0x80) return false;
+      if (i === normalizedData.length - 2 && byte === 0x80) return false;
       return true;
     }
   }
