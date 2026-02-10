@@ -1,6 +1,7 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -21,6 +22,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   const [scriptState, setScriptState] = useState<ScriptState | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
+  const [transactionVersion, setTransactionVersion] = useState(2);
 
   const { toast } = useToast();
 
@@ -67,7 +69,8 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         isComplete: false,
         isValid: false,
         unlockingScriptLength: unlockingInstructions.length,
-        context: 'UnlockingScript' as const
+        context: 'UnlockingScript' as const,
+        transactionVersion,
       };
       
       setScriptState(initialState);
@@ -84,7 +87,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         variant: "destructive",
       });
     }
-  }, [unlockingScript, lockingScript, toast]);
+  }, [unlockingScript, lockingScript, transactionVersion, toast]);
 
   const executeNextStep = useCallback(() => {
     if (!scriptState || scriptState.isComplete) return;
@@ -374,6 +377,28 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
                   onChange={(e) => setLockingScript(e.target.value)}
                   placeholder="Enter locking script&#10;Example:&#10;OP_ADD&#10;OP_3&#10;OP_EQUAL"
                   className="font-mono bg-slate-900 border-slate-600 text-red-400 min-h-32"
+                  disabled={isExecuting}
+                />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
+                <CardTitle className="text-gray-400">Transaction Version</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Input
+                  type="number"
+                  min={0}
+                  max={4294967295}
+                  value={transactionVersion}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (Number.isInteger(val) && val >= 0 && val <= 4294967295) {
+                      setTransactionVersion(val);
+                    }
+                  }}
+                  className="font-mono bg-slate-900 border-slate-600 text-blue-400 w-48"
                   disabled={isExecuting}
                 />
               </CardContent>

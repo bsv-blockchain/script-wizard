@@ -21,6 +21,7 @@ export interface ScriptState {
   isRunning?: boolean;  // Track if in run mode
   breakpoints?: Set<number>;  // Set of instruction indices that are breakpoints
   executionError?: string;  // Store execution error message
+  transactionVersion?: number;  // Transaction version (4-byte uint, default 2)
 }
 
 const castToBool = (val: Readonly<number[]>): boolean => {
@@ -272,11 +273,11 @@ const createSpendFromState = (state: ScriptState): Spend => {
     sourceOutputIndex: 0,
     sourceSatoshis: 2, // 1 BSV
     lockingScript,
-    transactionVersion: 1,
+    transactionVersion: state.transactionVersion ?? 2,
     otherInputs: [],
     outputs: [{
       satoshis: 1,
-      lockingScript: LockingScript.fromASM('OP_DUP OP_HASH160 76a914000000000000000000000000000000000000000088ac')
+      lockingScript: LockingScript.fromHex('76a914000000000000000000000000000000000000000088ac')
     }],
     unlockingScript,
     inputSequence: 0xffffffff,

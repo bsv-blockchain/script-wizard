@@ -1,8 +1,13 @@
 import type { Config } from "tailwindcss";
 import colors from "tailwindcss/colors";
 
-// Remove deprecated colors to avoid warnings
-const { lightBlue, warmGray, trueGray, coolGray, blueGray, ...tailwindColors } = colors;
+// Filter out deprecated color names without accessing their getters (which trigger warnings)
+const deprecatedColors = new Set(['lightBlue', 'warmGray', 'trueGray', 'coolGray', 'blueGray']);
+const tailwindColors = Object.fromEntries(
+	Object.keys(colors)
+		.filter(key => !deprecatedColors.has(key))
+		.map(key => [key, (colors as Record<string, unknown>)[key]])
+);
 
 export default {
 	darkMode: ["class"],
