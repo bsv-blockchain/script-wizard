@@ -10,7 +10,7 @@ import StackVisualizer from "./StackVisualizer";
 import ScriptDisplay from "./ScriptDisplay";
 import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBreakpoint, findNextBreakpoint, ScriptState } from "@/utils/scriptUtils";
 import { Transaction, UnlockingScript, LockingScript } from "@bsv/sdk";
-import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts } from "@/utils/urlUtils";
+import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts, ScriptParams } from "@/utils/urlUtils";
 import { useToast } from "@/hooks/use-toast";
 import { Share2, Play, Pause, SkipForward, RotateCcw, Loader2 } from "lucide-react";
 import { enrich } from "@/lib/utils";
@@ -39,16 +39,45 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
 
   // Load scripts from URL parameters on component mount
   useEffect(() => {
-    const urlParams = parseScriptParamsFromUrl();
-    if (urlParams.unlock || urlParams.lock) {
-      if (urlParams.unlock) {
-        setUnlockingScript(urlParams.unlock);
-      }
-      if (urlParams.lock) {
-        setLockingScript(urlParams.lock);
-      }
+    const urlParams: ScriptParams = parseScriptParamsFromUrl();
+    const vin = urlParams.vin ?? 0;
+
+    if (urlParams.txid) {
+      setLookupTxid(urlParams.txid);
+      setBeefInputIndex(vin);
+      // Fetch BEEF from chain
+      (async () => {
+        setLookupLoading(true);
+        try {
+          const hex = await woc.getBeef(urlParams.txid!);
+          setBeefHex(hex);
+          const tx = Transaction.fromHexBEEF(hex);
+          setBeefTx(tx);
+          await populateFromBeef(tx, vin);
+        } catch (e) {
+          setBeefError(e instanceof Error ? e.message : "Failed to fetch BEEF for TXID");
+        } finally {
+          setLookupLoading(false);
+        }
+      })();
+    } else if (urlParams.beef) {
+      setBeefHex(urlParams.beef);
+      setBeefInputIndex(vin);
+      (async () => {
+        try {
+          const tx = Transaction.fromHexBEEF(urlParams.beef!);
+          setBeefTx(tx);
+          await populateFromBeef(tx, vin);
+        } catch (e) {
+          setBeefError(e instanceof Error ? e.message : "Invalid BEEF hex");
+        }
+      })();
+    } else {
+      if (urlParams.unlock) setUnlockingScript(urlParams.unlock);
+      if (urlParams.lock) setLockingScript(urlParams.lock);
     }
-  }, [toast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Populate script textareas from a parsed BEEF transaction at the given input index
   const populateFromBeef = useCallback(async (tx: Transaction, inputIdx: number) => {
@@ -141,13 +170,19 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
     }
   }, [beefTx, beefInputIndex]);
 
-  // Update URL when scripts change (debounced)
+  // Update URL when relevant state changes (debounced)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      updateUrlWithScripts(unlockingScript, lockingScript);
+      updateUrlWithScripts({
+        lookupTxid: lookupTxid && beefTx ? lookupTxid : undefined,
+        beefHex: !lookupTxid && beefHex ? beefHex : undefined,
+        beefInputIndex,
+        unlockingScript,
+        lockingScript,
+      });
     }, 1000);
     return () => clearTimeout(timeoutId);
-  }, [unlockingScript, lockingScript]);
+  }, [unlockingScript, lockingScript, lookupTxid, beefHex, beefTx, beefInputIndex]);
 
   // Notify parent when execution state changes
   useEffect(() => {
@@ -345,8 +380,14 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
 
 
   const shareScript = useCallback(async () => {
-    const shareableUrl = generateShareableUrl(unlockingScript, lockingScript);
-    
+    const shareableUrl = generateShareableUrl({
+      lookupTxid: lookupTxid && beefTx ? lookupTxid : undefined,
+      beefHex: !lookupTxid && beefHex ? beefHex : undefined,
+      beefInputIndex,
+      unlockingScript,
+      lockingScript,
+    });
+
     try {
       await navigator.clipboard.writeText(shareableUrl);
       toast({
@@ -361,13 +402,13 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      
+
       toast({
         title: "Link Copied!",
         description: "Shareable link has been copied to your clipboard",
       });
     }
-  }, [unlockingScript, lockingScript, toast]);
+  }, [unlockingScript, lockingScript, lookupTxid, beefHex, beefTx, beefInputIndex, toast]);
 
   // Check if there are any breakpoints set
   const hasBreakpoints = scriptState && (
