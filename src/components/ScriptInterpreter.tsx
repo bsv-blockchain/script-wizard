@@ -12,8 +12,9 @@ import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBr
 import { Transaction, UnlockingScript, LockingScript } from "@bsv/sdk";
 import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts } from "@/utils/urlUtils";
 import { useToast } from "@/hooks/use-toast";
-import { Share2, Play, Pause, SkipForward, RotateCcw } from "lucide-react";
+import { Share2, Play, Pause, SkipForward, RotateCcw, Loader2 } from "lucide-react";
 import { enrich } from "@/lib/utils";
+import { woc } from "@/lib/woc";
 
 interface ScriptInterpreterProps {
   onExecutionStateChange?: (isExecuting: boolean) => void;
@@ -30,6 +31,9 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   const [beefTx, setBeefTx] = useState<Transaction | null>(null);
   const [beefInputIndex, setBeefInputIndex] = useState(0);
   const [beefError, setBeefError] = useState("");
+  const [lookupTxid, setLookupTxid] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [network, setNetwork] = useState("main");
 
   const { toast } = useToast();
 
@@ -89,6 +93,33 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
       await populateFromBeef(beefTx, idx);
     }
   }, [beefTx, populateFromBeef]);
+
+  // Handle network change
+  const handleNetworkChange = useCallback((value: string) => {
+    setNetwork(value);
+    woc.setNetwork(value);
+  }, []);
+
+  // Fetch BEEF from chain by TXID
+  const handleTxidLookup = useCallback(async () => {
+    const trimmed = lookupTxid.trim();
+    if (!trimmed) return;
+    setLookupLoading(true);
+    setBeefError("");
+    try {
+      const hex = await woc.getBeef(trimmed);
+      setBeefHex(hex);
+      const tx = Transaction.fromHexBEEF(hex);
+      setBeefTx(tx);
+      setBeefInputIndex(0);
+      await populateFromBeef(tx, 0);
+    } catch (e) {
+      setBeefTx(null);
+      setBeefError(e instanceof Error ? e.message : "Failed to fetch BEEF for TXID");
+    } finally {
+      setLookupLoading(false);
+    }
+  }, [lookupTxid, populateFromBeef]);
 
   // When BEEF is loaded and user edits a script textarea, update the in-memory tx object
   const handleUnlockingScriptChange = useCallback((value: string) => {
@@ -433,10 +464,36 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
                 <CardTitle className="text-gray-400">BEEF Transaction (Optional)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Select value={network} onValueChange={handleNetworkChange}>
+                    <SelectTrigger className="w-24 bg-slate-900 border-slate-600 text-yellow-400">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="main">main</SelectItem>
+                      <SelectItem value="test">test</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    value={lookupTxid}
+                    onChange={(e) => setLookupTxid(e.target.value)}
+                    placeholder="Paste TXID to fetch BEEF from chain"
+                    className="font-mono bg-slate-900 border-slate-600 text-yellow-400 text-xs flex-1"
+                    disabled={isExecuting || lookupLoading}
+                  />
+                  <Button
+                    onClick={handleTxidLookup}
+                    disabled={isExecuting || lookupLoading || !lookupTxid.trim()}
+                    variant="outline"
+                    className="bg-slate-900 border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-slate-900"
+                  >
+                    {lookupLoading ? <Loader2 size={16} className="animate-spin" /> : "Fetch"}
+                  </Button>
+                </div>
                 <Textarea
                   value={beefHex}
                   onChange={async (e) => await handleBeefHexChange(e.target.value)}
-                  placeholder="Paste BEEF hex to auto-populate scripts and enable signature verification"
+                  placeholder="Or paste BEEF hex directly"
                   className="font-mono bg-slate-900 border-slate-600 text-yellow-400 min-h-20 text-xs"
                   disabled={isExecuting}
                 />
