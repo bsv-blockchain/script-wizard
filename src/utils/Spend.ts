@@ -397,7 +397,7 @@ export default class Spend {
     }
 
     // Enforce push-only unlocking scripts when not relaxed (version <= 1)
-    if (this.context === 'UnlockingScript' && !this.isRelaxed() && currentOpcode > OP.OP_PUSHDATA4) {
+    if (this.context === 'UnlockingScript' && !this.isRelaxed() && currentOpcode > OP.OP_16) {
       this.scriptEvaluationError('Unlocking scripts can only contain push operations, and no other opcodes.')
     }
 

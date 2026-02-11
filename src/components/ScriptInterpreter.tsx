@@ -204,11 +204,23 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
 
   const initializeExecution = useCallback(() => {
     try {
+      // Sync current textarea content onto beefTx before execution so edits always persist
+      if (beefTx) {
+        try {
+          beefTx.inputs[beefInputIndex].unlockingScript = UnlockingScript.fromASM(unlockingScript);
+        } catch { /* will surface as a parse error below */ }
+        try {
+          const input = beefTx.inputs[beefInputIndex];
+          input.sourceTransaction!.outputs![input.sourceOutputIndex].lockingScript = LockingScript.fromASM(lockingScript);
+        } catch { /* will surface as a parse error below */ }
+        beefTx.version = transactionVersion;
+      }
+
       const unlockingInstructions = parseScript(unlockingScript);
       const lockingInstructions = parseScript(lockingScript);
-      
+
       const combinedInstructions = [...unlockingInstructions, ...lockingInstructions];
-      
+
       const initialState: ScriptState = {
         instructions: combinedInstructions,
         currentIndex: 0,
