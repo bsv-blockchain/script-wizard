@@ -1,5 +1,5 @@
 import { Utils, LockingScript, UnlockingScript, OP, Script, BigNumber, ScriptChunk,
-  TransactionInput, TransactionOutput, TransactionSignature, PublicKey, Hash, ScriptEvaluationError
+  TransactionInput, TransactionOutput, TransactionSignature, PublicKey, Hash, ECDSA, ScriptEvaluationError
 } from '@bsv/sdk'
 import { SignatureHashCache } from '@bsv/sdk/primitives/TransactionSignature'
 const { minimallyEncode } = Utils
@@ -133,6 +133,7 @@ export default class Spend {
   stackMem: number
   altStackMem: number
   isRelaxedOverride: boolean
+  verifySignatures: boolean
 
   private sigHashCache: SignatureHashCache
 
@@ -184,6 +185,7 @@ export default class Spend {
     lockTime: number
     memoryLimit?: number
     isRelaxed?: boolean
+    verifySignatures?: boolean
   }) {
     this.sourceTXID = params.sourceTXID
     this.sourceOutputIndex = params.sourceOutputIndex
@@ -198,6 +200,7 @@ export default class Spend {
     this.lockTime = params.lockTime
     this.memoryLimit = params.memoryLimit ?? 32000000
     this.isRelaxedOverride = params.isRelaxed === true
+    this.verifySignatures = params.verifySignatures === true
     this.stack = []
     this.altStack = []
     this.ifStack = []
@@ -338,28 +341,28 @@ export default class Spend {
     return true
   }
 
-  // private verifySignature (
-  //   sig: TransactionSignature,
-  //   pubkey: PublicKey,
-  //   subscript: Script
-  // ): boolean {
-  //   const preimage = TransactionSignature.formatBytes({
-  //     sourceTXID: this.sourceTXID,
-  //     sourceOutputIndex: this.sourceOutputIndex,
-  //     sourceSatoshis: this.sourceSatoshis,
-  //     transactionVersion: this.transactionVersion,
-  //     otherInputs: this.otherInputs,
-  //     outputs: this.outputs,
-  //     inputIndex: this.inputIndex,
-  //     subscript,
-  //     inputSequence: this.inputSequence,
-  //     lockTime: this.lockTime,
-  //     scope: sig.scope,
-  //     cache: this.sigHashCache
-  //   })
-  //   const hash = new BigNumber(Hash.hash256(preimage))
-  //   return verify(hash, sig, pubkey)
-  // }
+  private verifySignature (
+    sig: TransactionSignature,
+    pubkey: PublicKey,
+    subscript: Script
+  ): boolean {
+    const preimage = TransactionSignature.formatBytes({
+      sourceTXID: this.sourceTXID,
+      sourceOutputIndex: this.sourceOutputIndex,
+      sourceSatoshis: this.sourceSatoshis,
+      transactionVersion: this.transactionVersion,
+      otherInputs: this.otherInputs,
+      outputs: this.outputs,
+      inputIndex: this.inputIndex,
+      subscript,
+      inputSequence: this.inputSequence,
+      lockTime: this.lockTime,
+      scope: sig.scope,
+      cache: this.sigHashCache
+    })
+    const hash = new BigNumber(Hash.hash256(preimage))
+    return ECDSA.verify(hash, sig, pubkey)
+  }
 
   step (): boolean {
     if (this.stackMem > this.memoryLimit) {
@@ -866,7 +869,7 @@ export default class Spend {
               subscript.findAndDelete(new Script().writeBin(bufSig))
 
               pubkey = PublicKey.fromDER(bufPubkey)
-              fSuccess = true // this.verifySignature(sig, pubkey, subscript)
+              fSuccess = this.verifySignatures ? this.verifySignature(sig, pubkey, subscript) : true
             } catch (e) {
               fSuccess = false
             }
@@ -940,7 +943,7 @@ export default class Spend {
               try {
                 sig = TransactionSignature.fromChecksigFormat(bufSig)
                 pubkey = PublicKey.fromDER(bufPubkey)
-                fOk = true //this.verifySignature(sig, pubkey, subscript)
+                fOk = this.verifySignatures ? this.verifySignature(sig, pubkey, subscript) : true
               } catch (e) {
                 fOk = false
               }

@@ -1,4 +1,4 @@
-import { Script, OP, LockingScript, UnlockingScript, Utils } from '@bsv/sdk';
+import { Script, OP, LockingScript, UnlockingScript, Utils, Transaction } from '@bsv/sdk';
 import Spend from './Spend';
 
 export interface ScriptInstruction {
@@ -22,6 +22,8 @@ export interface ScriptState {
   breakpoints?: Set<number>;  // Set of instruction indices that are breakpoints
   executionError?: string;  // Store execution error message
   transactionVersion?: number;  // Transaction version (4-byte uint, default 2)
+  beefTx?: Transaction;  // Parsed Transaction from BEEF
+  beefInputIndex?: number;  // Selected input index
 }
 
 const castToBool = (val: Readonly<number[]>): boolean => {
@@ -246,32 +248,56 @@ const instructionsToASM = (instructions: ScriptInstruction[]): string => {
   }).join(' ');
 };
 
-// Helper function to initialize Spend instance from script state  
+// Helper function to initialize Spend instance from script state
 const createSpendFromState = (state: ScriptState): Spend => {
-  // Split instructions into unlocking and locking parts
+  // BEEF mode: extract real data from the parsed transaction
+  if (state.beefTx) {
+    const tx = state.beefTx;
+    const idx = state.beefInputIndex ?? 0;
+    const input = tx.inputs[idx];
+    const sourceOutput = input.sourceTransaction!.outputs![input.sourceOutputIndex];
+
+    return new Spend({
+      sourceTXID: input.sourceTXID ?? input.sourceTransaction!.id('hex'),
+      sourceOutputIndex: input.sourceOutputIndex,
+      sourceSatoshis: sourceOutput.satoshis!,
+      lockingScript: sourceOutput.lockingScript!,
+      transactionVersion: tx.version,
+      otherInputs: tx.inputs.filter((_, i) => i !== idx).map(inp => ({
+        sourceTXID: inp.sourceTXID ?? inp.sourceTransaction?.id('hex'),
+        sourceOutputIndex: inp.sourceOutputIndex,
+        sequence: inp.sequence ?? 0xffffffff
+      })),
+      outputs: tx.outputs.map(o => ({ satoshis: o.satoshis!, lockingScript: o.lockingScript! })),
+      unlockingScript: input.unlockingScript!,
+      inputSequence: input.sequence ?? 0xffffffff,
+      inputIndex: idx,
+      lockTime: tx.lockTime,
+      verifySignatures: true,
+    });
+  }
+
+  // Manual mode: use ASM-parsed scripts with mock transaction data
   const unlockingInstructions = state.instructions.slice(0, state.unlockingScriptLength);
   const lockingInstructions = state.instructions.slice(state.unlockingScriptLength);
-  
-  // Convert instructions to ASM format for Script.fromASM parsing
+
   const unlockingASM = instructionsToASM(unlockingInstructions);
   const lockingASM = instructionsToASM(lockingInstructions);
-  
+
   console.log('Creating scripts from ASM:', { unlockingASM, lockingASM });
-  
-  // Use Script.fromASM to properly parse user input to executable Script chunks
+
   const unlockingScript = unlockingASM.trim() ? UnlockingScript.fromASM(unlockingASM) : new UnlockingScript([]);
   const lockingScript = lockingASM.trim() ? LockingScript.fromASM(lockingASM) : new LockingScript([]);
-  
+
   console.log('Created scripts with chunks:', {
     unlockingChunks: unlockingScript.chunks.length,
     lockingChunks: lockingScript.chunks.length
   });
-  
-  // Create a mock Spend instance with minimal required data
+
   return new Spend({
     sourceTXID: '0000000000000000000000000000000000000000000000000000000000000000',
     sourceOutputIndex: 0,
-    sourceSatoshis: 2, // 1 BSV
+    sourceSatoshis: 2,
     lockingScript,
     transactionVersion: state.transactionVersion ?? 2,
     otherInputs: [],

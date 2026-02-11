@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StackVisualizer from "./StackVisualizer";
 import ScriptDisplay from "./ScriptDisplay";
 import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBreakpoint, findNextBreakpoint, ScriptState, ScriptInstruction } from "@/utils/scriptUtils";
+import { Transaction, UnlockingScript, LockingScript } from "@bsv/sdk";
 import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts } from "@/utils/urlUtils";
 import { useToast } from "@/hooks/use-toast";
 import { Share2, Copy, Play, Pause, SkipForward, RotateCcw } from "lucide-react";
@@ -23,6 +25,10 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   const [isExecuting, setIsExecuting] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [transactionVersion, setTransactionVersion] = useState(2);
+  const [beefHex, setBeefHex] = useState("");
+  const [beefTx, setBeefTx] = useState<Transaction | null>(null);
+  const [beefInputIndex, setBeefInputIndex] = useState(0);
+  const [beefError, setBeefError] = useState("");
 
   const { toast } = useToast();
 
@@ -39,7 +45,65 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
     }
   }, [toast]);
 
+  // Populate script textareas from a parsed BEEF transaction at the given input index
+  const populateFromBeef = useCallback((tx: Transaction, inputIdx: number) => {
+    const input = tx.inputs[inputIdx];
+    const sourceOutput = input.sourceTransaction!.outputs![input.sourceOutputIndex];
+    setUnlockingScript(input.unlockingScript!.toASM());
+    setLockingScript(sourceOutput.lockingScript!.toASM());
+    setTransactionVersion(tx.version);
+  }, []);
 
+  // Handle BEEF hex input changes
+  const handleBeefHexChange = useCallback((hex: string) => {
+    setBeefHex(hex);
+    const trimmed = hex.trim();
+    if (!trimmed) {
+      setBeefTx(null);
+      setBeefError("");
+      setBeefInputIndex(0);
+      return;
+    }
+    try {
+      const tx = Transaction.fromHexBEEF(trimmed);
+      setBeefTx(tx);
+      setBeefError("");
+      setBeefInputIndex(0);
+      populateFromBeef(tx, 0);
+    } catch (e) {
+      setBeefTx(null);
+      setBeefError(e instanceof Error ? e.message : "Invalid BEEF hex");
+    }
+  }, [populateFromBeef]);
+
+  // Handle input index change for BEEF mode
+  const handleBeefInputIndexChange = useCallback((value: string) => {
+    const idx = parseInt(value, 10);
+    setBeefInputIndex(idx);
+    if (beefTx) {
+      populateFromBeef(beefTx, idx);
+    }
+  }, [beefTx, populateFromBeef]);
+
+  // When BEEF is loaded and user edits a script textarea, update the in-memory tx object
+  const handleUnlockingScriptChange = useCallback((value: string) => {
+    setUnlockingScript(value);
+    if (beefTx) {
+      try {
+        beefTx.inputs[beefInputIndex].unlockingScript = UnlockingScript.fromASM(value);
+      } catch { /* ignore parse errors during editing */ }
+    }
+  }, [beefTx, beefInputIndex]);
+
+  const handleLockingScriptChange = useCallback((value: string) => {
+    setLockingScript(value);
+    if (beefTx) {
+      try {
+        const input = beefTx.inputs[beefInputIndex];
+        input.sourceTransaction!.outputs![input.sourceOutputIndex].lockingScript = LockingScript.fromASM(value);
+      } catch { /* ignore parse errors during editing */ }
+    }
+  }, [beefTx, beefInputIndex]);
 
   // Update URL when scripts change (debounced)
   useEffect(() => {
@@ -71,6 +135,8 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         unlockingScriptLength: unlockingInstructions.length,
         context: 'UnlockingScript' as const,
         transactionVersion,
+        beefTx: beefTx ?? undefined,
+        beefInputIndex: beefTx ? beefInputIndex : undefined,
       };
       
       setScriptState(initialState);
@@ -87,7 +153,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         variant: "destructive",
       });
     }
-  }, [unlockingScript, lockingScript, transactionVersion, toast]);
+  }, [unlockingScript, lockingScript, transactionVersion, beefTx, beefInputIndex, toast]);
 
   const executeNextStep = useCallback(() => {
     if (!scriptState || scriptState.isComplete) return;
@@ -354,12 +420,46 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
           <>
             <Card className="bg-slate-800 border-slate-700">
               <CardHeader>
+                <CardTitle className="text-gray-400">BEEF Transaction (Optional)</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Textarea
+                  value={beefHex}
+                  onChange={(e) => handleBeefHexChange(e.target.value)}
+                  placeholder="Paste BEEF hex to auto-populate scripts and enable signature verification"
+                  className="font-mono bg-slate-900 border-slate-600 text-yellow-400 min-h-20 text-xs"
+                  disabled={isExecuting}
+                />
+                {beefError && (
+                  <p className="text-red-400 text-sm">{beefError}</p>
+                )}
+                {beefTx && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-gray-400 text-sm">Input Index:</span>
+                    <Select value={String(beefInputIndex)} onValueChange={handleBeefInputIndexChange}>
+                      <SelectTrigger className="w-40 bg-slate-900 border-slate-600 text-yellow-400">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {beefTx.inputs.map((_, i) => (
+                          <SelectItem key={i} value={String(i)}>Input {i}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-green-400 text-sm">Parsed OK — {beefTx.inputs.length} input(s)</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-slate-800 border-slate-700">
+              <CardHeader>
                 <CardTitle className="text-gray-400">Unlocking Script</CardTitle>
               </CardHeader>
               <CardContent>
                 <Textarea
                   value={unlockingScript}
-                  onChange={(e) => setUnlockingScript(e.target.value)}
+                  onChange={(e) => handleUnlockingScriptChange(e.target.value)}
                   placeholder="Enter unlocking script&#10;Example:&#10;OP_1&#10;OP_2"
                   className="font-mono bg-slate-900 border-slate-600 text-green-400 min-h-32"
                   disabled={isExecuting}
@@ -374,7 +474,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
               <CardContent>
                 <Textarea
                   value={lockingScript}
-                  onChange={(e) => setLockingScript(e.target.value)}
+                  onChange={(e) => handleLockingScriptChange(e.target.value)}
                   placeholder="Enter locking script&#10;Example:&#10;OP_ADD&#10;OP_3&#10;OP_EQUAL"
                   className="font-mono bg-slate-900 border-slate-600 text-red-400 min-h-32"
                   disabled={isExecuting}
