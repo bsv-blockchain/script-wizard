@@ -12,7 +12,7 @@ import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBr
 import { Transaction, UnlockingScript, LockingScript } from "@bsv/sdk";
 import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts, ScriptParams } from "@/utils/urlUtils";
 import { useToast } from "@/hooks/use-toast";
-import { Share2, Play, Pause, SkipForward, RotateCcw, Loader2, X } from "lucide-react";
+import { Share2, Play, Pause, SkipForward, RotateCcw, Loader2, X, HelpCircle } from "lucide-react";
 import { enrich } from "@/lib/utils";
 import { woc } from "@/lib/woc";
 
@@ -34,6 +34,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   const [lookupTxid, setLookupTxid] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [network, setNetwork] = useState("main");
+  const [showHelp, setShowHelp] = useState(() => localStorage.getItem('showHelp') !== 'false');
 
   const { toast } = useToast();
 
@@ -429,10 +430,22 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Share Script Button - Top Right */}
-      <div className="fixed top-4 right-4 z-10">
-        <Button 
+    <div className={scriptState || !showHelp ? "space-y-6" : "grid grid-cols-1 lg:grid-cols-2 gap-6"}>
+      {/* Top Right Buttons */}
+      <div className="fixed top-4 right-4 z-10 flex gap-2">
+        {!scriptState && (
+          <Button
+            onClick={() => setShowHelp(v => { const next = !v; localStorage.setItem('showHelp', String(next)); return next; })}
+            variant="outline"
+            className={showHelp
+              ? "bg-slate-900 border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
+              : "bg-slate-900 border-slate-500 text-slate-500 hover:bg-slate-500 hover:text-slate-900"}
+            title={showHelp ? "Hide help" : "Show help"}
+          >
+            <HelpCircle size={16} />
+          </Button>
+        )}
+        <Button
           onClick={shareScript}
           variant="outline"
           className="bg-slate-900 border-blue-400 text-blue-400 hover:bg-blue-400 hover:text-slate-900"
@@ -442,7 +455,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         </Button>
       </div>
 
-      {/* Left Column - Script Input */}
+      {/* Left Column - Script Input (or full-width controls when executing) */}
       <div className="space-y-6">
         {/* Control Buttons - Always at the top */}
         <div className="flex gap-3 flex-wrap">
@@ -636,25 +649,25 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         )}
       </div>
 
-      {/* Right Column - Execution Visualization / Help */}
-      <div className="space-y-6">
-        {scriptState ? (
-          <>
-            <ScriptDisplay
-              instructions={scriptState.instructions}
-              currentIndex={scriptState.currentIndex}
-              unlockingScriptLength={scriptState.unlockingScriptLength}
-              breakpoints={scriptState.breakpoints}
-              onBreakpointToggle={handleBreakpointToggle}
-            />
-            <Separator className="bg-slate-600" />
-            <StackVisualizer
-              stack={scriptState.stack}
-              altStack={scriptState.altStack}
-            />
-          </>
-        ) : (
-          <Card className="bg-slate-800 border-slate-700">
+      {/* Execution Visualization (full-width) / Help panel (right column) */}
+      {scriptState ? (
+        <div className="space-y-6">
+          <ScriptDisplay
+            instructions={scriptState.instructions}
+            currentIndex={scriptState.currentIndex}
+            unlockingScriptLength={scriptState.unlockingScriptLength}
+            breakpoints={scriptState.breakpoints}
+            onBreakpointToggle={handleBreakpointToggle}
+          />
+          <Separator className="bg-slate-600" />
+          <StackVisualizer
+            stack={scriptState.stack}
+            altStack={scriptState.altStack}
+          />
+        </div>
+      ) : showHelp && (
+        <div className="space-y-6">
+          <Card className="bg-slate-800 border-slate-700 mt-16">
             <CardHeader>
               <CardTitle className="text-gray-400">Getting Started</CardTitle>
             </CardHeader>
@@ -690,8 +703,8 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
               </div>
             </CardContent>
           </Card>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
