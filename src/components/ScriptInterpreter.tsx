@@ -43,6 +43,11 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
     const urlParams: ScriptParams = parseScriptParamsFromUrl();
     const vin = urlParams.vin ?? 0;
 
+    if (urlParams.network) {
+      setNetwork(urlParams.network);
+      woc.setNetwork(urlParams.network);
+    }
+
     if (urlParams.txid) {
       setLookupTxid(urlParams.txid);
       setBeefInputIndex(vin);
@@ -192,10 +197,11 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         beefInputIndex,
         unlockingScript,
         lockingScript,
+        network,
       });
     }, 1000);
     return () => clearTimeout(timeoutId);
-  }, [unlockingScript, lockingScript, lookupTxid, beefHex, beefTx, beefInputIndex]);
+  }, [unlockingScript, lockingScript, lookupTxid, beefHex, beefTx, beefInputIndex, network]);
 
   // Notify parent when execution state changes
   useEffect(() => {
@@ -333,6 +339,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
       beefInputIndex,
       unlockingScript,
       lockingScript,
+      network,
     });
 
     try {
@@ -355,7 +362,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         description: "Shareable link has been copied to your clipboard",
       });
     }
-  }, [unlockingScript, lockingScript, lookupTxid, beefHex, beefTx, beefInputIndex, toast]);
+  }, [unlockingScript, lockingScript, lookupTxid, beefHex, beefTx, beefInputIndex, network, toast]);
 
   // Check if there are any breakpoints set
   const hasBreakpoints = scriptState && (

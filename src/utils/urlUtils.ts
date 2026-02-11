@@ -13,6 +13,7 @@ export interface ScriptParams {
   txid?: string;
   beef?: string;
   vin?: number;
+  network?: string;
 }
 
 /**
@@ -49,6 +50,11 @@ export const parseScriptParamsFromUrl = (): ScriptParams => {
   const txidParam = urlParams.get('txid');
   const beefParam = urlParams.get('beef');
   const vinParam = urlParams.get('vin');
+  const networkParam = urlParams.get('network');
+
+  if (networkParam) {
+    params.network = networkParam;
+  }
 
   if (txidParam) {
     params.txid = txidParam;
@@ -79,15 +85,21 @@ export const parseScriptParamsFromUrl = (): ScriptParams => {
 /**
  * Generates a shareable URL with the appropriate parameters.
  */
-export const generateShareableUrl = (opts: {
+interface UrlOpts {
   lookupTxid?: string;
   beefHex?: string;
   beefInputIndex?: number;
   unlockingScript?: string;
   lockingScript?: string;
-}): string => {
-  const baseUrl = window.location.origin + window.location.pathname;
+  network?: string;
+}
+
+const buildParams = (opts: UrlOpts): URLSearchParams => {
   const params = new URLSearchParams();
+
+  if (opts.network && opts.network !== 'main') {
+    params.set('network', opts.network);
+  }
 
   if (opts.lookupTxid?.trim()) {
     params.set('txid', opts.lookupTxid.trim());
@@ -108,43 +120,22 @@ export const generateShareableUrl = (opts: {
     }
   }
 
+  return params;
+};
+
+export const generateShareableUrl = (opts: UrlOpts): string => {
+  const baseUrl = window.location.origin + window.location.pathname;
+  const params = buildParams(opts);
   return params.toString() ? `${baseUrl}?${params.toString()}` : baseUrl;
 };
 
 /**
  * Updates the current URL without page reload.
  */
-export const updateUrlWithScripts = (opts: {
-  lookupTxid?: string;
-  beefHex?: string;
-  beefInputIndex?: number;
-  unlockingScript?: string;
-  lockingScript?: string;
-}): void => {
-  const params = new URLSearchParams();
-
-  if (opts.lookupTxid?.trim()) {
-    params.set('txid', opts.lookupTxid.trim());
-    if (opts.beefInputIndex != null && opts.beefInputIndex > 0) {
-      params.set('vin', String(opts.beefInputIndex));
-    }
-  } else if (opts.beefHex?.trim()) {
-    params.set('beef', opts.beefHex.trim());
-    if (opts.beefInputIndex != null && opts.beefInputIndex > 0) {
-      params.set('vin', String(opts.beefInputIndex));
-    }
-  } else {
-    if (opts.unlockingScript?.trim()) {
-      params.set('unlock', encodeScriptForUrl(opts.unlockingScript));
-    }
-    if (opts.lockingScript?.trim()) {
-      params.set('lock', encodeScriptForUrl(opts.lockingScript));
-    }
-  }
-
+export const updateUrlWithScripts = (opts: UrlOpts): void => {
+  const params = buildParams(opts);
   const newUrl = params.toString()
     ? `${window.location.pathname}?${params.toString()}`
     : window.location.pathname;
-
   window.history.replaceState({}, '', newUrl);
 };
