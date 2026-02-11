@@ -668,8 +668,17 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
       ) : showHelp && (
         <div className="space-y-6">
           <Card className="bg-slate-800 border-slate-700 mt-16">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-gray-400">Getting Started</CardTitle>
+              <Button
+                onClick={() => setShowHelp(() => { localStorage.setItem('showHelp', 'false'); return false; })}
+                variant="ghost"
+                size="icon"
+                className="text-slate-500 hover:text-slate-300 h-8 w-8"
+                title="Hide help"
+              >
+                <X size={16} />
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4 text-sm text-slate-300">
               <div>
