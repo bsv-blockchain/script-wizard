@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,11 +8,12 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import StackVisualizer from "./StackVisualizer";
 import ScriptDisplay from "./ScriptDisplay";
-import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBreakpoint, findNextBreakpoint, ScriptState, ScriptInstruction } from "@/utils/scriptUtils";
+import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBreakpoint, findNextBreakpoint, ScriptState } from "@/utils/scriptUtils";
 import { Transaction, UnlockingScript, LockingScript } from "@bsv/sdk";
 import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts } from "@/utils/urlUtils";
 import { useToast } from "@/hooks/use-toast";
-import { Share2, Copy, Play, Pause, SkipForward, RotateCcw } from "lucide-react";
+import { Share2, Play, Pause, SkipForward, RotateCcw } from "lucide-react";
+import { enrich } from "@/lib/utils";
 
 interface ScriptInterpreterProps {
   onExecutionStateChange?: (isExecuting: boolean) => void;
@@ -46,8 +47,12 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   }, [toast]);
 
   // Populate script textareas from a parsed BEEF transaction at the given input index
-  const populateFromBeef = useCallback((tx: Transaction, inputIdx: number) => {
+  const populateFromBeef = useCallback(async (tx: Transaction, inputIdx: number) => {
     const input = tx.inputs[inputIdx];
+    console.log({ input })
+    if (!input.sourceTransaction) {
+      await enrich(input)
+    }
     const sourceOutput = input.sourceTransaction!.outputs![input.sourceOutputIndex];
     setUnlockingScript(input.unlockingScript!.toASM());
     setLockingScript(sourceOutput.lockingScript!.toASM());
@@ -55,7 +60,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   }, []);
 
   // Handle BEEF hex input changes
-  const handleBeefHexChange = useCallback((hex: string) => {
+  const handleBeefHexChange = useCallback(async (hex: string) => {
     setBeefHex(hex);
     const trimmed = hex.trim();
     if (!trimmed) {
@@ -69,7 +74,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
       setBeefTx(tx);
       setBeefError("");
       setBeefInputIndex(0);
-      populateFromBeef(tx, 0);
+      await populateFromBeef(tx, 0);
     } catch (e) {
       setBeefTx(null);
       setBeefError(e instanceof Error ? e.message : "Invalid BEEF hex");
@@ -77,11 +82,11 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
   }, [populateFromBeef]);
 
   // Handle input index change for BEEF mode
-  const handleBeefInputIndexChange = useCallback((value: string) => {
+  const handleBeefInputIndexChange = useCallback(async (value: string) => {
     const idx = parseInt(value, 10);
     setBeefInputIndex(idx);
     if (beefTx) {
-      populateFromBeef(beefTx, idx);
+      await populateFromBeef(beefTx, idx);
     }
   }, [beefTx, populateFromBeef]);
 
@@ -147,6 +152,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         description: `Ready to execute ${combinedInstructions.length} instructions`,
       });
     } catch (error) {
+      console.error("Failed to parse script:", error);
       toast({
         title: "Parse Error",
         description: error instanceof Error ? error.message : "Failed to parse script",
@@ -173,6 +179,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         });
       }
     } catch (error) {
+      console.error("Failed to execute instruction:", error);
       toast({
         title: "Execution Error",
         description: error instanceof Error ? error.message : "Failed to execute instruction",
@@ -216,6 +223,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
           });
         }
       } catch (error) {
+        console.error("Failed to run script:", error);
         setIsRunning(false);
         toast({
           title: "Execution Error",
@@ -283,11 +291,13 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
             description: `Stopped at instruction ${newState.currentIndex + 1}`,
           });
         }
-      } catch (error) {
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Failed to execute to next breakpoint";
+        console.error("Failed to execute to next breakpoint:", e);
         setIsRunning(false);
         toast({
           title: "Execution Error",
-          description: error instanceof Error ? error.message : "Failed to execute to next breakpoint",
+          description: message,
           variant: "destructive",
         });
         setIsExecuting(false);
@@ -425,7 +435,7 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
               <CardContent className="space-y-3">
                 <Textarea
                   value={beefHex}
-                  onChange={(e) => handleBeefHexChange(e.target.value)}
+                  onChange={async (e) => await handleBeefHexChange(e.target.value)}
                   placeholder="Paste BEEF hex to auto-populate scripts and enable signature verification"
                   className="font-mono bg-slate-900 border-slate-600 text-yellow-400 min-h-20 text-xs"
                   disabled={isExecuting}
