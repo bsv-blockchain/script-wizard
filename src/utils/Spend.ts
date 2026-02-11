@@ -396,6 +396,11 @@ export default class Spend {
       this.scriptEvaluationError(`Data push > ${maxScriptElementSize} bytes (pc=${this.programCounter}).`) // Error thrown
     }
 
+    // Enforce push-only unlocking scripts when not relaxed (version <= 1)
+    if (this.context === 'UnlockingScript' && !this.isRelaxed() && currentOpcode > OP.OP_PUSHDATA4) {
+      this.scriptEvaluationError('Unlocking scripts can only contain push operations, and no other opcodes.')
+    }
+
     const isScriptExecuting = !this.ifStack.includes(false)
 
     if (isScriptExecuting && currentOpcode >= 0 && currentOpcode <= OP.OP_PUSHDATA4) {

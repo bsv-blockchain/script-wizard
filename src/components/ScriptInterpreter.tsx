@@ -242,77 +242,35 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
 
   const executeNextStep = useCallback(() => {
     if (!scriptState || scriptState.isComplete) return;
-    
+
     try {
       const newState = executeStep(scriptState);
       setScriptState(newState);
-      
-      if (newState.isComplete) {
-        setIsExecuting(false);
-        toast({
-          title: newState.isValid ? "Script Valid!" : "Script Invalid",
-          description: newState.executionError || (newState.isValid 
-            ? "Script executed successfully" 
-            : "Script execution failed"),
-          variant: newState.isValid ? "default" : "destructive",
-        });
-      }
+      if (newState.isComplete) setIsExecuting(false);
     } catch (error) {
       console.error("Failed to execute instruction:", error);
-      toast({
-        title: "Execution Error",
-        description: error instanceof Error ? error.message : "Failed to execute instruction",
-        variant: "destructive",
-      });
       setIsExecuting(false);
     }
-  }, [scriptState, toast]);
+  }, [scriptState]);
 
   const executeRunMode = useCallback(() => {
     if (!scriptState || scriptState.isComplete) return;
-    
+
     setIsRunning(true);
-    
-    // Use setTimeout to allow UI to update
+
     setTimeout(() => {
       try {
         const newState = executeRun(scriptState);
         setScriptState(newState);
         setIsRunning(false);
-        
-        if (newState.isComplete) {
-          setIsExecuting(false);
-          toast({
-            title: newState.isValid ? "Script Valid!" : "Script Invalid",
-            description: newState.executionError || (newState.isValid 
-              ? "Script executed successfully" 
-              : "Script execution failed"),
-            variant: newState.isValid ? "default" : "destructive",
-          });
-        } else if (newState.executionError) {
-          toast({
-            title: "Execution Stopped",
-            description: newState.executionError,
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Breakpoint Hit",
-            description: "Execution paused at breakpoint",
-          });
-        }
+        if (newState.isComplete) setIsExecuting(false);
       } catch (error) {
         console.error("Failed to run script:", error);
         setIsRunning(false);
-        toast({
-          title: "Execution Error",
-          description: error instanceof Error ? error.message : "Failed to run script",
-          variant: "destructive",
-        });
         setIsExecuting(false);
       }
     }, 100);
-  }, [scriptState, toast]);
+  }, [scriptState]);
 
   const handleBreakpointToggle = useCallback((instructionIndex: number) => {
     if (!scriptState) return;
@@ -328,61 +286,25 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
 
   const executeToNextBreakpointHandler = useCallback(() => {
     if (!scriptState || scriptState.isComplete) return;
-    
-    // Check if there are any breakpoints ahead
+
     const nextBreakpointIndex = findNextBreakpoint(scriptState);
-    if (nextBreakpointIndex === null) {
-      toast({
-        title: "No More Breakpoints",
-        description: "No breakpoints found ahead. Use 'Run' to execute to completion.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+    if (nextBreakpointIndex === null) return;
+
     setIsRunning(true);
-    
-    // Use setTimeout to allow UI to update
+
     setTimeout(() => {
       try {
         const newState = executeToNextBreakpoint(scriptState);
         setScriptState(newState);
         setIsRunning(false);
-        
-        if (newState.isComplete) {
-          setIsExecuting(false);
-          toast({
-            title: newState.isValid ? "Script Valid!" : "Script Invalid",
-            description: newState.executionError || (newState.isValid 
-              ? "Script executed successfully" 
-              : "Script execution failed"),
-            variant: newState.isValid ? "default" : "destructive",
-          });
-        } else if (newState.executionError) {
-          toast({
-            title: "Execution Stopped",
-            description: newState.executionError,
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Next Breakpoint Reached",
-            description: `Stopped at instruction ${newState.currentIndex + 1}`,
-          });
-        }
-      } catch (e: unknown) {
-        const message = e instanceof Error ? e.message : "Failed to execute to next breakpoint";
+        if (newState.isComplete) setIsExecuting(false);
+      } catch (e) {
         console.error("Failed to execute to next breakpoint:", e);
         setIsRunning(false);
-        toast({
-          title: "Execution Error",
-          description: message,
-          variant: "destructive",
-        });
         setIsExecuting(false);
       }
     }, 100);
-  }, [scriptState, toast]);
+  }, [scriptState]);
 
   const resetExecution = useCallback(() => {
     setScriptState(null);
@@ -638,6 +560,9 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
                     const val = Number(e.target.value);
                     if (Number.isInteger(val) && val >= 0 && val <= 4294967295) {
                       setTransactionVersion(val);
+                      if (beefTx) {
+                        beefTx.version = val;
+                      }
                     }
                   }}
                   className="font-mono bg-slate-900 border-slate-600 text-blue-400 w-48"
@@ -652,12 +577,30 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
       {/* Execution Visualization (full-width) / Help panel (right column) */}
       {scriptState ? (
         <div className="space-y-6">
+          {scriptState.isComplete && (
+            <Card className={scriptState.isValid
+              ? "border-green-500 bg-green-950/30"
+              : "border-red-500 bg-red-950/30"
+            }>
+              <CardContent className="py-4">
+                <h3 className={`font-semibold mb-1 ${scriptState.isValid ? "text-green-400" : "text-red-400"}`}>
+                  {scriptState.isValid ? "Script Valid" : "Script Invalid"}
+                </h3>
+                <p className="text-sm text-slate-300 font-mono break-all whitespace-pre-wrap">
+                  {scriptState.executionError || (scriptState.isValid
+                    ? "Script executed successfully."
+                    : "The top stack element is not truthy.")}
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <ScriptDisplay
             instructions={scriptState.instructions}
             currentIndex={scriptState.currentIndex}
             unlockingScriptLength={scriptState.unlockingScriptLength}
             breakpoints={scriptState.breakpoints}
             onBreakpointToggle={handleBreakpointToggle}
+            transactionVersion={scriptState.transactionVersion}
           />
           <Separator className="bg-slate-600" />
           <StackVisualizer

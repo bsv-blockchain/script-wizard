@@ -10,14 +10,16 @@ interface ScriptDisplayProps {
   unlockingScriptLength: number;
   breakpoints?: Set<number>;
   onBreakpointToggle?: (instructionIndex: number) => void;
+  transactionVersion?: number;
 }
 
-const ScriptDisplay: React.FC<ScriptDisplayProps> = ({ 
-  instructions, 
-  currentIndex, 
+const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
+  instructions,
+  currentIndex,
   unlockingScriptLength,
   breakpoints,
-  onBreakpointToggle
+  onBreakpointToggle,
+  transactionVersion
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const currentInstructionRef = useRef<HTMLDivElement>(null);
@@ -38,6 +40,9 @@ const ScriptDisplay: React.FC<ScriptDisplayProps> = ({
     <Card className="bg-slate-800 border-slate-700">
       <CardHeader>
         <CardTitle className="text-gray-400">Script Execution</CardTitle>
+        {transactionVersion != null && (
+          <p className="text-xs text-slate-500">Transaction Version: <span className="text-blue-400">{transactionVersion}</span></p>
+        )}
       </CardHeader>
       <CardContent>
         <div ref={containerRef} className="space-y-1 max-h-64 overflow-y-auto">
