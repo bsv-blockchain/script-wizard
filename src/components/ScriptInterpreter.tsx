@@ -12,7 +12,7 @@ import { parseScript, executeStep, executeRun, executeToNextBreakpoint, toggleBr
 import { Transaction, UnlockingScript, LockingScript } from "@bsv/sdk";
 import { parseScriptParamsFromUrl, generateShareableUrl, updateUrlWithScripts, ScriptParams } from "@/utils/urlUtils";
 import { useToast } from "@/hooks/use-toast";
-import { Share2, Play, Pause, SkipForward, RotateCcw, Loader2 } from "lucide-react";
+import { Share2, Play, Pause, SkipForward, RotateCcw, Loader2, X } from "lucide-react";
 import { enrich } from "@/lib/utils";
 import { woc } from "@/lib/woc";
 
@@ -149,6 +149,18 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
       setLookupLoading(false);
     }
   }, [lookupTxid, populateFromBeef]);
+
+  // Clear all BEEF, TXID, and script state
+  const clearAll = useCallback(() => {
+    setLookupTxid("");
+    setBeefHex("");
+    setBeefTx(null);
+    setBeefInputIndex(0);
+    setBeefError("");
+    setUnlockingScript("");
+    setLockingScript("");
+    setTransactionVersion(2);
+  }, []);
 
   // When BEEF is loaded and user edits a script textarea, update the in-memory tx object
   const handleUnlockingScriptChange = useCallback((value: string) => {
@@ -530,6 +542,15 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
                   >
                     {lookupLoading ? <Loader2 size={16} className="animate-spin" /> : "Fetch"}
                   </Button>
+                  <Button
+                    onClick={clearAll}
+                    disabled={isExecuting || lookupLoading}
+                    variant="outline"
+                    className="bg-slate-900 border-slate-400 text-slate-400 hover:bg-slate-400 hover:text-slate-900"
+                    title="Clear all"
+                  >
+                    <X size={16} />
+                  </Button>
                 </div>
                 <Textarea
                   value={beefHex}
@@ -615,11 +636,11 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
         )}
       </div>
 
-      {/* Right Column - Execution Visualization */}
+      {/* Right Column - Execution Visualization / Help */}
       <div className="space-y-6">
-        {scriptState && (
+        {scriptState ? (
           <>
-            <ScriptDisplay 
+            <ScriptDisplay
               instructions={scriptState.instructions}
               currentIndex={scriptState.currentIndex}
               unlockingScriptLength={scriptState.unlockingScriptLength}
@@ -627,11 +648,48 @@ const ScriptInterpreter = ({ onExecutionStateChange }: ScriptInterpreterProps = 
               onBreakpointToggle={handleBreakpointToggle}
             />
             <Separator className="bg-slate-600" />
-            <StackVisualizer 
+            <StackVisualizer
               stack={scriptState.stack}
               altStack={scriptState.altStack}
             />
           </>
+        ) : (
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-gray-400">Getting Started</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm text-slate-300">
+              <div>
+                <h3 className="text-blue-400 font-semibold mb-1">Load a Transaction</h3>
+                <p>Paste a <span className="text-yellow-400">TXID</span> and click <span className="text-yellow-400">Fetch</span> to load a confirmed transaction from the blockchain. Select the network (main/test) and choose which input to debug. You can also paste raw <span className="text-yellow-400">BEEF hex</span> directly for off-chain transactions.</p>
+              </div>
+              <Separator className="bg-slate-700" />
+              <div>
+                <h3 className="text-blue-400 font-semibold mb-1">Write Scripts Manually</h3>
+                <p>Enter an <span className="text-green-400">unlocking script</span> and a <span className="text-red-400">locking script</span> using opcodes (e.g. <code className="text-slate-400">OP_DUP OP_HASH160</code>) or hex data. Scripts are executed in sequence: unlocking first, then locking.</p>
+              </div>
+              <Separator className="bg-slate-700" />
+              <div>
+                <h3 className="text-blue-400 font-semibold mb-1">Debug Execution</h3>
+                <p>Click <span className="text-blue-400">Initialize Execution</span> to begin. Then use <span className="text-blue-400">Next Step</span> to advance one opcode at a time, or <span className="text-green-400">Run</span> to execute to completion. The stack and script position update in real time.</p>
+              </div>
+              <Separator className="bg-slate-700" />
+              <div>
+                <h3 className="text-blue-400 font-semibold mb-1">Breakpoints</h3>
+                <p>Click any instruction during execution to toggle a breakpoint. Use <span className="text-orange-400">Next Breakpoint</span> to skip ahead. <code className="text-slate-400">OP_NOP69</code> acts as an inline breakpoint marker.</p>
+              </div>
+              <Separator className="bg-slate-700" />
+              <div>
+                <h3 className="text-blue-400 font-semibold mb-1">Signature Verification</h3>
+                <p>When a transaction is loaded via TXID or BEEF, <code className="text-slate-400">OP_CHECKSIG</code> and <code className="text-slate-400">OP_CHECKMULTISIG</code> perform real ECDSA verification against the transaction data. In manual mode they always return true.</p>
+              </div>
+              <Separator className="bg-slate-700" />
+              <div>
+                <h3 className="text-blue-400 font-semibold mb-1">Share</h3>
+                <p>Click the <span className="text-blue-400">share</span> button to copy a URL that restores your current scripts or transaction. TXIDs produce compact links; pasted BEEF is encoded in the URL directly.</p>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
