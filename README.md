@@ -109,7 +109,7 @@ Contributions are welcome! Please feel free to submit issues, feature requests, 
 
 ## 📄 License
 
-This project is open source and available under the OpenBSV license.
+This project is open source and available under the Apache License 2.0.
 
 ## 🔗 Links
 
